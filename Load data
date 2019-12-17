@@ -1,0 +1,72 @@
+library(shinydashboard)
+library(readxl)
+library(gbRd) # for Rd_fun
+library(tools) # for Rd2HTML
+out <- data.frame(baseFns = ls('package:base'))
+ui <- dashboardPage(
+  dashboardHeader(title = "Loading data"),
+dashboardSidebar(sidebarMenu(
+  menuItem("Load Data", tabName = "Load_Data", icon = icon("balance-scale")),
+  menuItem("Analysis", tabName = "Analysis", icon = icon("chart-bar"))
+)),
+dashboardBody(
+  tabItems(tabItem(tabName = "Load_Data",textInput("T", "No of data sets", value = 0,width = 150),
+          fluidRow(box(fileInput("datafile","Choose the csv file",multiple = TRUE, 
+            accept = c("text/csv","text/comma-separated-values,text/plain",".csv")),width = 2),
+  box(fileInput("datafile1","Choose the excel file",multiple = TRUE, 
+            accept = c(".xlsx")),width = 2)),
+  fluidRow(box(title = "Dataset",uiOutput("filter_70"),width = 5000))),
+  tabItem(tabName = "Analysis",
+          fluidRow(box(selectInput("S","Select Tabs",choices = c("A","B"),width = "150px"),uiOutput("Tab1"),
+          selectInput("A","A",choices = c(levels(factor(out$baseFns))),width = "150px"),width = 2),
+          fluidRow(box(htmlOutput("Text"),width = 9)))
+  )
+))
+)
+
+server <- function(input,output){
+output$contents <- renderTable({
+  file_to_read <- input$datafile
+  if(is.null(file_to_read))
+     return(NULL)
+     a <- read.csv(file_to_read$datapath)
+     head(a,n=15)
+})
+output$contents1 <- renderTable({
+  file_to_read1 <- input$datafile1
+  if(is.null(file_to_read1))
+    return(NULL)
+    a1 <- read_excel(file_to_read1$datapath)
+    head(a1,n=15)
+})
+
+last_selected <- reactiveVal(NA)
+
+observeEvent(input$datafile, {
+  last_selected("csv")
+})
+observeEvent(input$datafile1, {
+  last_selected("excel")
+})
+output$filter_70 <- renderUI({
+  req(last_selected())
+  if (last_selected()=="csv") {
+    tableOutput("contents")
+  } else if (last_selected()=="excel") {
+    tableOutput("contents1")
+  }
+})
+output$Tab1 <- renderUI({
+  if(input$S == "B"){
+    label = "Company"
+    selectInput("S1",label,choices = c("C"),width = "150px")}
+})
+output$Text <- renderUI({
+  Rd <- Rd_fun(help(input$A)) 
+  outfile <- tempfile(fileext = ".html")
+  Rd2HTML(Rd, outfile, package = "",
+          stages = c("install", "render"))
+  includeHTML(outfile)
+})
+}
+shinyApp(ui, server)
